@@ -45,8 +45,6 @@ msg_speed.data = 20
 msg_steer = Float32()
 msg_steer.data = 0
 
-def dynamic_speed(angle):
-    return 70 - (abs(angle) * 5)
 
 # model = build_model()
 # # model = get_seg()
@@ -133,9 +131,9 @@ class sync_listener:
                 # cv2.imshow("signs", sign)
             # print("start predicting ... ")
             pr_mask = model.predict(image_np)
-            angle = get_steer(image_np, pr_mask)
+            speed, angle = get_steer(image_np, pr_mask)
             msg_steer.data = float(angle) 
-            msg_speed.data = float(dynamic_speed(angle))
+            msg_speed.data = float(speed)
             pub_steer.publish(msg_steer)
             pub_speed.publish(msg_speed)
             # cv2.waitKey(1)

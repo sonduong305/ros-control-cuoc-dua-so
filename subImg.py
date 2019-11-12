@@ -67,7 +67,7 @@ start_time = time.time()
 def drive_callback(ros_data):
 	global start_time
 	global model
-	if(time.time()-start_time > 0.04):
+	if(time.time()-start_time > 0.05):
 		
 		np_arr = np.fromstring(ros_data.data, np.uint8)
 		image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
@@ -80,9 +80,10 @@ def drive_callback(ros_data):
 		# angle = float(model.predict(image, batch_size=1))
 
 		pr_mask = model.predict(image_np)
-		angle = get_steer(image_np, pr_mask)
+		speed, angle = get_steer(image_np, pr_mask)
 		# print(angle)
 		msg_steer.data = angle 
+		msg_speed.data = speed
 		pub_steer.publish(msg_steer)
 		pub_speed.publish(msg_speed)
 		cv2.waitKey(1)

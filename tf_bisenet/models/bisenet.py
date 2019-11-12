@@ -88,14 +88,15 @@ class BiseNet(object):
         self.images = None
         self.images_feed = None
         self.labels = None
-        self.regression_label = None
+        self.label_regression = None
         self.net = None
-        self.fc = None
+        self.regression_predict = None
         self.sup1 = None
         self.sup2 = None
         self.init_fn = None
         self.loss = None
         self.total_loss = None
+        self.regression_loss = None
         self.response = None
 
     def build_inputs(self):
@@ -110,7 +111,7 @@ class BiseNet(object):
             # DataSet prepare
             with tf.device("/cpu:0"):
                 dataset = DataLoader(self.data_config, self.train_config['DataSet'], self.train_config['class_dict'])
-                self.images, labels = dataset.get_one_batch()
+                self.images, labels, self.label_regression = dataset.get_one_batch()
                 self.labels = tf.one_hot(labels, self.num_classes)
 
         else:
@@ -143,76 +144,88 @@ class BiseNet(object):
           BiSeNet model
         """
 
-        ### The spatial path
-        ### The number of feature maps for each convolution is not specified in the paper
-        ### It was chosen here to be equal to the number of feature maps of a classification
-        ### model at each corresponding stage
-        batch_norm_params = self.model_config['batch_norm_params']
-        init_method = self.model_config['conv_config']['init_method']
+        with tf.variable_scope('Bisenet', reuse=tf.AUTO_REUSE):
+            ### The spatial path
+            ### The number of feature maps for each convolution is not specified in the paper
+            ### It was chosen here to be equal to the number of feature maps of a classification
+            ### model at each corresponding stage
+            batch_norm_params = self.model_config['batch_norm_params']
+            init_method = self.model_config['conv_config']['init_method']
 
-        if init_method == 'kaiming_normal':
-            initializer = slim.variance_scaling_initializer(factor=2.0, mode='FAN_IN', uniform=False)
-        else:
-            initializer = slim.xavier_initializer()
+            if init_method == 'kaiming_normal':
+                initializer = slim.variance_scaling_initializer(factor=2.0, mode='FAN_IN', uniform=False)
+            else:
+                initializer = slim.xavier_initializer()
 
-        with tf.variable_scope('spatial_net', reuse=reuse):
-            with slim.arg_scope([slim.conv2d], biases_initializer=None, weights_initializer=initializer):
-                with slim.arg_scope([slim.batch_norm], is_training=self.is_training(), **batch_norm_params):
-                    spatial_net = ConvBlock(self.images, n_filters=64, kernel_size=[7, 7], strides=2)
-                    spatial_net = ConvBlock(spatial_net, n_filters=64, kernel_size=[3, 3], strides=2)
-                    spatial_net = ConvBlock(spatial_net, n_filters=64, kernel_size=[3, 3], strides=2)
-                    spatial_net = ConvBlock(spatial_net, n_filters=128, kernel_size=[1, 1])
+            with tf.variable_scope('spatial_net', reuse=reuse):
+                with slim.arg_scope([slim.conv2d], biases_initializer=None, weights_initializer=initializer):
+                    with slim.arg_scope([slim.batch_norm], is_training=self.is_training(), **batch_norm_params):
+                        spatial_net = ConvBlock(self.images, n_filters=64, kernel_size=[7, 7], strides=2)
+                        spatial_net = ConvBlock(spatial_net, n_filters=64, kernel_size=[3, 3], strides=2)
+                        spatial_net = ConvBlock(spatial_net, n_filters=64, kernel_size=[3, 3], strides=2)
+                        spatial_net = ConvBlock(spatial_net, n_filters=128, kernel_size=[1, 1])
 
-        frontend_config = self.model_config['frontend_config']
-        ### Context path
-        logits, end_points, frontend_scope, init_fn = frontend_builder.build_frontend(self.images, frontend_config,
-                                                                                      self.is_training(), reuse)
+            frontend_config = self.model_config['frontend_config']
+            ### Context path
+            logits, end_points, frontend_scope, init_fn = frontend_builder.build_frontend(self.images, frontend_config,
+                                                                                          self.is_training(), reuse)
 
-        ### Combining the paths
-        with tf.variable_scope('combine_path', reuse=reuse):
-            with slim.arg_scope([slim.conv2d], biases_initializer=None, weights_initializer=initializer):
-                with slim.arg_scope([slim.batch_norm], is_training=self.is_training(), **batch_norm_params):
-                    # tail part
-                    size = tf.shape(end_points['pool5'])[1:3]
-                    global_context = tf.reduce_mean(end_points['pool5'], [1, 2], keep_dims=True)
-                    global_context = slim.conv2d(global_context, 128, 1, [1, 1], activation_fn=None)
-                    global_context = tf.nn.relu(slim.batch_norm(global_context, fused=True))
-                    global_context = tf.image.resize_bilinear(global_context, size=size)
+            ### Combining the paths
+            with tf.variable_scope('combine_path', reuse=reuse):
+                with slim.arg_scope([slim.conv2d], biases_initializer=None, weights_initializer=initializer):
+                    with slim.arg_scope([slim.batch_norm], is_training=self.is_training(), **batch_norm_params):
+                        # tail part
+                        size = tf.shape(end_points['pool5'])[1:3]
+                        global_context = tf.reduce_mean(end_points['pool5'], [1, 2], keep_dims=True)
+                        global_context = slim.conv2d(global_context, 128, 1, [1, 1], activation_fn=None)
+                        global_context = tf.nn.relu(slim.batch_norm(global_context, fused=True))
+                        global_context = tf.image.resize_bilinear(global_context, size=size)
 
-                    net_5 = AttentionRefinementModule(end_points['pool5'], n_filters=128)
-                    net_4 = AttentionRefinementModule(end_points['pool4'], n_filters=128)
+                        net_5 = AttentionRefinementModule(end_points['pool5'], n_filters=128)
+                        net_4 = AttentionRefinementModule(end_points['pool4'], n_filters=128)
 
-                    net_5 = tf.add(net_5, global_context)
-                    net_5 = Upsampling(net_5, scale=2)
-                    net_5 = ConvBlock(net_5, n_filters=128, kernel_size=[3, 3])
-                    net_4 = tf.add(net_4, net_5)
-                    net_4 = Upsampling(net_4, scale=2)
-                    net_4 = ConvBlock(net_4, n_filters=128, kernel_size=[3, 3])
+                        net_5 = tf.add(net_5, global_context)
+                        net_5 = Upsampling(net_5, scale=2)
+                        net_5 = ConvBlock(net_5, n_filters=128, kernel_size=[3, 3])
+                        net_4 = tf.add(net_4, net_5)
+                        net_4 = Upsampling(net_4, scale=2)
+                        net_4 = ConvBlock(net_4, n_filters=128, kernel_size=[3, 3])
 
-                    context_net = net_4
+                        context_net = net_4
 
-                    net = FeatureFusionModule(input_1=spatial_net, input_2=context_net, n_filters=256)
-                    net_5 = ConvBlock(net_5, n_filters=128, kernel_size=[3, 3])
-                    net_4 = ConvBlock(net_4, n_filters=128, kernel_size=[3, 3])
-                    net = ConvBlock(net, n_filters=64, kernel_size=[3, 3])
+                        net = FeatureFusionModule(input_1=spatial_net, input_2=context_net, n_filters=256)
+                        net_5 = ConvBlock(net_5, n_filters=128, kernel_size=[3, 3])
+                        net_4 = ConvBlock(net_4, n_filters=128, kernel_size=[3, 3])
+                        net = ConvBlock(net, n_filters=64, kernel_size=[3, 3])
 
-                    # Upsampling + dilation or only Upsampling
-                    net = Upsampling(net, scale=2)
-                    net = slim.conv2d(net, 64, [3, 3], rate=2, activation_fn=tf.nn.relu, biases_initializer=None,
-                                      normalizer_fn=slim.batch_norm)
+                        # Upsampling + dilation or only Upsampling
+                        net = Upsampling(net, scale=2)
+                        net = slim.conv2d(net, 64, [3, 3], rate=2, activation_fn=tf.nn.relu, biases_initializer=None,
+                                          normalizer_fn=slim.batch_norm)
 
-                    net = slim.conv2d(net, self.num_classes, [1, 1], activation_fn=None, scope='logits')
-                    self.net = Upsampling(net, 4)
+                        net = slim.conv2d(net, self.num_classes, [1, 1], activation_fn=None, scope='logits')
+                        self.net = Upsampling(net, 4)
 
-                    # net = slim.conv2d(net, self.num_classes, [1, 1], activation_fn=None, scope='logits')
-                    # self.net = Upsampling(net, scale=8)
+                        # net = slim.conv2d(net, self.num_classes, [1, 1], activation_fn=None, scope='logits')
+                        # self.net = Upsampling(net, scale=8)
 
-                    if self.mode in ['train', 'validation', 'test']:
-                        sup1 = slim.conv2d(net_5, self.num_classes, [1, 1], activation_fn=None, scope='supl1')
-                        sup2 = slim.conv2d(net_4, self.num_classes, [1, 1], activation_fn=None, scope='supl2')
-                        self.sup1 = Upsampling(sup1, scale=16)
-                        self.sup2 = Upsampling(sup2, scale=8)
-                        self.init_fn = init_fn
+                        if self.mode in ['train', 'validation', 'test']:
+                            sup1 = slim.conv2d(net_5, self.num_classes, [1, 1], activation_fn=None, scope='supl1')
+                            sup2 = slim.conv2d(net_4, self.num_classes, [1, 1], activation_fn=None, scope='supl2')
+                            self.sup1 = Upsampling(sup1, scale=16)
+                            self.sup2 = Upsampling(sup2, scale=8)
+                            self.init_fn = init_fn
+
+                        print("="*100)
+                        print(self.net)
+        #with tf.variable_scope('Regression', reuse=tf.AUTO_REUSE):
+        #    conv = tf.layers.conv2d(self.net, filters=1, kernel_size=3, strides=1, padding="SAME")
+        #    conv = tf.layers.conv2d(conv, filters=1, kernel_size=3, strides=1, padding="SAME")
+        #    flatten = tf.layers.flatten(conv)
+        #    flatten = tf.reshape(tensor=flatten, shape=[-1, 102400])
+        #    fc = tf.layers.dense(flatten, 1000)
+        #    self.regression_predict = tf.layers.dense(fc, 2)
+
 
     def build_loss(self):
         loss1 = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.net, labels=self.labels))
@@ -221,7 +234,7 @@ class BiseNet(object):
         loss = loss1+loss2+loss3
         tf.losses.add_loss(loss)
 
-        # loss1 = tf.losses.mean_squared_error(self.regression_label, self.fc )
+        # self.regression_loss = tf.losses.mean_squared_error(self.label_regression, self.regression_predict )
 
         self.loss = loss1
         self.total_loss = tf.losses.get_total_loss()
@@ -236,6 +249,7 @@ class BiseNet(object):
         tf.summary.image('response', tf.reshape(tf.matmul(
             tf.reshape(tf.one_hot(tf.argmax(self.net, -1), self.num_classes), [-1, 7]), colors),
             [-1, shape[1], shape[2], 3]), family=self.mode, max_outputs=1)
+        # tf.summary.scalar('regression_loss', self.regression_loss, family=self.mode)
         tf.summary.scalar('total_loss', self.total_loss, family=self.mode)
         tf.summary.scalar('loss', self.loss, family=self.mode)
 

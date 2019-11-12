@@ -71,6 +71,7 @@ def drive_callback(ros_data):
 		
 		np_arr = np.fromstring(ros_data.data, np.uint8)
 		image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+		image_np = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
 		cv2.imshow('cv_img', image_np)
 
 		# image = np.asarray(image_np)       # from PIL image to numpy array
@@ -91,6 +92,7 @@ def drive_callback(ros_data):
 def depth_callback(ros_data):
 	np_arr = np.fromstring(ros_data.data, np.uint8)
 	image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+	
 	cv2.imshow('depth', image_np)
 	# image_np = cv2.resize(image_np, (320, 320))
 	# print(type(image_np))

@@ -45,18 +45,29 @@ def get_sign_mask(img):
         if cv2.contourArea(contours[0]) > 70:
             sign = cv2.boundingRect(contours[0])
     return sign
-
+i = 0
+def binary_sign(gray_sign):
+    global graph
+    global i
+    with graph.as_default():        
+        # sign = cv2.cvtColor(gray_sign, cv2.COLOR_RGB2GRAY)
+        sign = np.array([np.reshape(gray_sign, (32,32,3))])
+        result = model.predict(sign, batch_size = 1) + 1
+    cv2.imwrite("/home/sonduong/catkin_ws/src/beginner_tutorials/scripts/sign_data_temp/" + str(i) + str(result) + ".png", gray_sign)
+    i += 1
+    return result
 def sign_classify(img_rgb, mask):
     global graph
     sign_rect = get_sign_mask(mask)
     result = -1
+    
     if(sign_rect != -1):
         with graph.as_default():
             sign = img_rgb[sign_rect[1]: sign_rect[1] + sign_rect[3], sign_rect[0]: sign_rect[0] + sign_rect[2]]
             sign = cv2.resize(sign, (32, 32))
-            
-            sign = cv2.cvtColor(sign, cv2.COLOR_BGR2GRAY)
-            sign = np.array([np.reshape(sign, (32,32,1))])
+            # sign = cv2.cvtColor(sign, cv2.COLOR_BGR2GRAY)
+            cv2.imshow("sign", sign)
+            sign = np.array([np.reshape(sign, (32,32,3))])
             result = model.predict(sign, batch_size = 1) + 1
     return result
 left_cors = get_line_cor((159, 159), (0, 130)).T
@@ -110,7 +121,7 @@ def get_confident_vectors(bird_view_img):
     left += 2.6 * l
     right += 2.6 * r
     turn = ((left / (left + right)) - angle_bias) * 2
-    print(t)
+    # print(t)
     # print("")
     return - turn
     # line = cv2.line
@@ -120,7 +131,7 @@ def get_steer(img_rgb, mask):
     frame = cv2.resize(mask, ( 320, 240)).astype(np.uint8)
     road_mask = get_road_mask(frame)
     bird_view = get_bird_view(road_mask)
-    cv2.imshow("sign", bird_view)
+    cv2.imshow("mask", mask)
     sign = sign_classify(cv2.resize(img_rgb, ( 320, 240)).astype(np.uint8), frame)
     if sign != -1:
         print("Co bien bao! " + str(sign))

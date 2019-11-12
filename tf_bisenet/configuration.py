@@ -45,8 +45,8 @@ MODEL_CONFIG = {
 }
 
 TRAIN_CONFIG = {
-  'DataSet': 'Data_xin',
-  'class_dict': './Data_xin/classdict.csv',
+  'DataSet': 'Synthia',
+  'class_dict': './Synthia/classdict.csv',
   'train_dir': osp.join(LOG_DIR, 'checkpoints', RUN_NAME),
 
   'seed': 123,  # fix seed for reproducing experiments
@@ -58,8 +58,8 @@ TRAIN_CONFIG = {
                         'crop_w': 320,
                         'random_scale': True,
                         'random_mirror': True,
-                        'num_examples_per_epoch': 300,
-                        'epoch': 20000,
+                        'num_examples_per_epoch': 12000,
+                        'epoch': 2000,
                         'batch_size': 4,
                         'prefetch_threads': 8, },
 
@@ -90,7 +90,7 @@ TRAIN_CONFIG = {
 
   # Learning rate configs
   'lr_config': {'policy': 'polynomial',         # piecewise_constant, exponential, polynomial and cosine
-                'initial_lr': 1e-4,
+                'initial_lr': 0.01,
                 'power': 0.9,                   # Only useful in polynomial
                 'num_epochs_per_decay': 1,
                 'lr_decay_factor': 0.8685113737513527,

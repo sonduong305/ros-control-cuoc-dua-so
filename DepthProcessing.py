@@ -86,41 +86,70 @@ def get_weights(img):
     # cv2.imshow("hist 2", hist)
     # print(right.sum() / left.sum())
     return ((right.sum() / left.sum()) - 1 ) * - 15
+def circle_check(cnt):
+    if cv2.contourArea(cnt) < 70:
+        return False
+    (x,y),radius = cv2.minEnclosingCircle(cnt)
+    radius = int(radius)
+    area = np.pi * radius * radius
+    return abs(cv2.contourArea(cnt) - area) < 30
 
-
-import os
-path = "/home/sonduong/catkin_ws/src/lane_detect/src/img6/"
-smooth = cv2.imread("/home/sonduong/catkin_ws/src/beginner_tutorials/scripts/hi.png", 0)
-fnames = os.listdir(path)
-fnames.sort()
-i = 0 
-# np.median()
-while(True):
-    name  = fnames[i]
-    frame = cv2.imread(path + name, 0)
-    frame_r = cv2.absdiff(frame, smooth)
-    hist = get_collums_hist(frame[130: 220, :])
-    hist_r = get_collums_hist(frame_r[130 : 220, :])
-    lap = getGradientMagnitude(frame)
-    lap *= 2
-    lap = np.where(lap < 255, lap, 255)
-    cv2.imshow('depth', frame_r)
-    cv2.imshow("hist", lap)
-    cv2.imshow("hist_r", hist_r)
-    print(get_weights(frame_r[120: 220, :]))
-
-
+def get_sign(img):
+    black = np.zeros([240, 320],dtype=np.uint8)
+    pts = np.array([[0,40],[100,40],[120,100],[0, 150]], np.int32)
+    cv2.fillPoly(black, [pts], 255)
+    pts = np.array([[320,40],[220,40],[200,100],[320, 150]], np.int32)
+    cv2.fillPoly(black, [pts], 255)
+    result = cv2.bitwise_and(img, black)
     
-    key = cv2.waitKey(0)
-    # i+=1
-    # print(key)
-    if key == 27:
-        break
-    if (key == 81) or (key == 82):
-        # print("back")
-        i = i - 1
-        continue
-    elif (key == 83) or (key == 84):
-        i += 1
-        # print("next")
-        continue
+    kernel = np.ones((3,3),np.uint8)
+    edged = cv2.morphologyEx(result,cv2.MORPH_CLOSE, kernel)
+    canny_output = cv2.Canny(edged, 200, 100)
+    contours, hierarchy = cv2.findContours(canny_output, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    # print(len(contours))
+    result = []
+    for cnt in contours:
+        if circle_check(cnt):
+            result = cv2.boundingRect(cnt)
+            break
+            # print(cv2.contourArea(cnt))
+            # print("")
+    
+    return result
+
+# import os
+# path = "/home/sonduong/catkin_ws/src/lane_detect/src/img6/"
+# smooth = cv2.imread("/home/sonduong/catkin_ws/src/beginner_tutorials/scripts/hi.png", 0)
+# fnames = os.listdir(path)
+# fnames.sort()
+# i = 0 
+# # np.median()
+# while(True):
+#     name  = fnames[i]
+#     frame = cv2.imread(path + name, 0)
+#     frame_r = cv2.absdiff(frame, smooth)
+#     hist = get_collums_hist(frame[130: 220, :])
+#     hist_r = get_collums_hist(frame_r[130 : 220, :])
+#     lap = getGradientMagnitude(frame)
+#     lap *= 2
+#     lap = np.where(lap < 255, lap, 255)
+#     cv2.imshow('depth', frame_r)
+#     cv2.imshow("hist", lap)
+#     cv2.imshow("hist_r", hist_r)
+#     # print(get_weights(frame_r[120: 220, :]))
+#     cv2.imshow("signs", get_sign(frame)
+# )
+    
+#     key = cv2.waitKey(0)
+#     # i+=1
+#     # print(key)
+#     if key == 27:
+#         break
+#     if (key == 81) or (key == 82):
+#         # print("back")
+#         i = i - 1
+#         continue
+#     elif (key == 83) or (key == 84):
+#         i += 1
+#         # print("next")
+#         continue

@@ -84,8 +84,8 @@ def xception(inputs, layers, channels,
                 net = make_layers(net, layers[i], channels[i], stride=2, scope='stage'+str(i+1))
 
             end_points = slim.utils.convert_collection_to_dict(end_points_collection)
-            end_points['pool3'] = end_points[scope + '/stage1']
-            end_points['pool4'] = end_points[scope + '/stage2']
+            end_points['pool3'] = end_points["Bisenet/" + scope + '/stage1']
+            end_points['pool4'] = end_points["Bisenet/" + scope + '/stage2']
             end_points['pool5'] = net
 
         return net, end_points

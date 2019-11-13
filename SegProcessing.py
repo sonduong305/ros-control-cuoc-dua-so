@@ -20,7 +20,7 @@ print("Loaded model from disk")
 
 
 def dynamic_speed(angle):
-    return 70 - (abs(angle) * 5)
+    return 80 - (abs(angle) * 5)
 def get_bird_view(img):
     IMAGE_H = 160
     IMAGE_W = 320
@@ -40,9 +40,16 @@ def get_car_mask(img):
     car_color = (143, 0, 0)
     truck_color = (69, 0, 0)
     result = cv2.inRange(img, truck_color, car_color)
-    cv2.imshow("sign", result)
-    kernel = np.ones((31, 31))
+    
+    kernel = np.ones((11, 11))
     result = cv2.dilate(result, kernel)
+    kernel = np.zeros((21, 21))
+    kernel[10, 10] =  1
+    kernel[5, 20] = 1
+    kernel[15, 20] = 1
+    kernel = kernel.astype(np.uint8)
+    result = cv2.dilate(result, kernel)
+    # cv2.imshow("sign", result)
     return result
 def get_road_mask(img):
     road_color = (128, 64, 128)
@@ -184,7 +191,7 @@ def get_steer(img_rgb, mask):
         sign = np.array(list_signs).mean()
         sign = int(round(sign))
         turning_frame = 35
-        speed = 30
+        speed = 40
         turn_dir = sign - 1
         if turn_dir == 0:
             turn_dir = -1 
@@ -197,7 +204,7 @@ def get_steer(img_rgb, mask):
         if angle_bias < 0:
             angle_bias = 0
         angle = (angle_bias * turn_dir) + angle
-        speed = 30
+        speed = 40
     else:
         turn_dir = 0
         list_signs = []

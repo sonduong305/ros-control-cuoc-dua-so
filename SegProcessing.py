@@ -36,9 +36,21 @@ def get_bird_view(img):
     return warped_img
     # return cv2.resize(warped_img, (IMAGE_W * 2, IMAGE_H * 2))
 
+def get_car_mask(img):
+    car_color = (143, 0, 0)
+    truck_color = (69, 0, 0)
+    result = cv2.inRange(img, truck_color, car_color)
+    cv2.imshow("sign", result)
+    kernel = np.ones((31, 31))
+    result = cv2.dilate(result, kernel)
+    return result
 def get_road_mask(img):
     road_color = (128, 64, 128)
     result = cv2.inRange(img, road_color, road_color)
+    temp = cv2.bitwise_and(get_car_mask(img), result)
+    result = result - temp
+    result = result.astype(np.uint8)
+    result = np.where(result >= 0, result, 0)
     return result
 def get_sign_mask(img):
     sign_color = (0, 220, 220)
@@ -139,8 +151,8 @@ def get_confident_vectors(bird_view_img):
 
 
     # l, r, t = start_turning(bird_view_img)
-    left += 3 * sub_left
-    right += 3 * sub_right
+    left += 5 * sub_left
+    right += 5 * sub_right
     turn = ((left / (left + right)) - angle_bias) * 2
 
 
@@ -148,16 +160,18 @@ def get_confident_vectors(bird_view_img):
 
 turning_frame = 0
 turn_dir = 0
+list_signs = []
 def get_steer(img_rgb, mask):
     # global turn_thresh
     global turning_frame
     global turn_dir
+    global list_signs
     frame = cv2.resize(mask, ( 320, 240)).astype(np.uint8)
     road_mask = get_road_mask(frame)
     bird_view = get_bird_view(road_mask)
-    cv2.imshow("mask", mask)
-    cv2.imshow("bird_view", bird_view)
-    angle = (get_confident_vectors(bird_view)) * 20
+    cv2.imshow("mask", frame)
+    # cv2.imshow("bird_view", bird_view)
+    angle = (get_confident_vectors(bird_view)) * 30
     speed = dynamic_speed(angle)
 
 
@@ -166,6 +180,8 @@ def get_steer(img_rgb, mask):
     if sign != -1:
         print("Co bien bao! " + str(sign))
         sign = sign[0][0]
+        list_signs.append(sign)
+        sign = np.array(list_signs).mean()
         sign = int(round(sign))
         turning_frame = 35
         speed = 30
@@ -184,6 +200,7 @@ def get_steer(img_rgb, mask):
         speed = 30
     else:
         turn_dir = 0
+        list_signs = []
     
     
     return  speed, angle

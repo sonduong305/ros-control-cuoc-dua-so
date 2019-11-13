@@ -72,7 +72,7 @@ def drive_callback(ros_data):
 		np_arr = np.fromstring(ros_data.data, np.uint8)
 		image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 		image_np = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
-		cv2.imshow('cv_img', image_np)
+		# cv2.imshow('cv_img', image_np)
 
 		# image = np.asarray(image_np)       # from PIL image to numpy array
 		# image = preprocess(image) 			# apply the preprocessing

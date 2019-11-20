@@ -1,3 +1,6 @@
 saved_models/
 tf_bisenet.zip
 model.pyc
+utils.pyc
+.vscode/
+__pycache__/

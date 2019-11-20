@@ -67,12 +67,14 @@ start_time = time.time()
 def drive_callback(ros_data):
 	global start_time
 	global model
-	if(time.time()-start_time > 0.05):
-		
+	# print("revieved !")
+	
+	if(time.time()-start_time > 0.01):
+			
 		np_arr = np.fromstring(ros_data.data, np.uint8)
 		image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 		image_np = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
-		cv2.imshow('cv_img', image_np)
+		# cv2.imshow('cv_img', image_np)
 
 		# image = np.asarray(image_np)       # from PIL image to numpy array
 		# image = preprocess(image) 			# apply the preprocessing
@@ -80,13 +82,17 @@ def drive_callback(ros_data):
 		# angle = float(model.predict(image, batch_size=1))
 
 		pr_mask = model.predict(image_np)
+		print(time.time() - start_time)
 		speed, angle = get_steer(image_np, pr_mask)
-		# print(angle)
+		# print(speed , angle)
+
 		msg_steer.data = angle 
 		msg_speed.data = speed
 		pub_steer.publish(msg_steer)
 		pub_speed.publish(msg_speed)
-		cv2.waitKey(1)
+		# cv2.waitKey(1)
+		print(time.time() - start_time)
+		print("")
 		start_time = time.time()
 		
 		

@@ -17,7 +17,9 @@ from tf_bisenet import configuration
 import cv2
 import numpy as np
 import time
-
+import rospkg
+rospack = rospkg.RosPack()
+cur_dir = rospack.get_path('beginner_tutorials')
 
 colors = np.array([[0,0,0],
 [128,64,128],
@@ -55,7 +57,7 @@ class BiseNet_Loader(object):
 
         # sess.run(local_variables_init_op)
         self.saver1 = tf.train.Saver(var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='Bisenet'))
-        self.saver1.restore(self.sess, "/home/sonduong/catkin_ws/src/beginner_tutorials/scripts/tf_bisenet/Logs/bisenet-v2/model.ckpt-90000")
+        self.saver1.restore(self.sess, cur_dir + "/scripts/tf_bisenet/Logs/bisenet-v2/model.ckpt-90000")
         img = np.ones((1, 320, 320, 3))
         self.transform = tf.reshape(tf.matmul(tf.reshape(tf.one_hot(tf.argmax(self.response, -1), 7), [-1, 7]), colors),
                             [-1, infer_size[0], infer_size[1], 3])

@@ -40,10 +40,12 @@ depth_np = 0
 depth_hist = 0
 
 from tf_bisenet.BiSeNet_Loader import BiseNet_Loader
-from SegProcessing import get_steer, binary_sign
+from SegProcessing import get_steer, binary_sign, init_classifier
+
 
 model = BiseNet_Loader()
 
+init_classifier()
 msg_speed = Float32()
 msg_speed.data = 20
 msg_steer = Float32()
@@ -89,7 +91,7 @@ def drive_callback(rgb_data):
         msg_speed.data = float(speed)
         pub_steer.publish(msg_steer)
         pub_speed.publish(msg_speed)
-        # cv2.waitKey(1)
+        cv2.waitKey(1)
         # print(time.time() - start_time)
         start_time = time.time()
 
@@ -113,7 +115,7 @@ class sync_listener:
             image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
             image_np = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
             # print("start showing image ... ")
-            # cv2.imshow('view', image_np)
+            cv2.imshow('view', image_np)
 
             pr_mask = model.predict(image_np)
             speed, angle = get_steer(image_np, pr_mask)
@@ -121,7 +123,7 @@ class sync_listener:
             msg_speed.data = float(speed)
             pub_steer.publish(msg_steer)
             pub_speed.publish(msg_speed)
-            # cv2.waitKey(1)
+            cv2.waitKey(1)
             # print(time.time() - start_time)
             start_time = time.time()
 

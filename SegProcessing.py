@@ -16,9 +16,11 @@ json_file.close()
 model = model_from_json(loaded_model_json)
 # load weights into new model
 model.load_weights(cur_dir + "/scripts/sign_classifier/model.h5")
-with graph.as_default():
-    model.predict(np.ones((1,32,32,3)))
-print("Loaded model from disk")
+
+def init_classifier():
+    with graph.as_default():
+        model.predict(np.ones((1,32,32,3)))
+    print("Loaded model from disk")
 
 
 
@@ -33,9 +35,6 @@ dst = np.float32([[135, IMAGE_H], [185, IMAGE_H], [0 - 20, 0], [IMAGE_W + 20, 0]
 M = cv2.getPerspectiveTransform(src, dst) # The transformation matrix
 def get_bird_view(img):
 
-    # Minv = cv2.getPerspectiveTransform(dst, src) # Inverse transformation
-
-    # img = cv2.imread('./test_img.jpg') # Read the test img
     img = img[80:(80+IMAGE_H), 0:IMAGE_W] # Apply np slicing for ROI crop
     warped_img = cv2.warpPerspective(img, M, (IMAGE_W, IMAGE_H)) # Image warping
     return warped_img
@@ -110,13 +109,13 @@ def sign_classify(img_rgb, mask):
     result = -1
     
     if(sign_rect != -1):
-        with graph.as_default():
-            sign = img_rgb[sign_rect[1]: sign_rect[1] + sign_rect[3], sign_rect[0]: sign_rect[0] + sign_rect[2]]
-            sign = cv2.resize(sign, (32, 32))
-            # sign = cv2.cvtColor(sign, cv2.COLOR_BGR2GRAY)
-            # cv2.imshow("sign", sign)
-            sign = np.array([sign])
-            result = model.predict(sign, batch_size = 1) + 1
+        # with graph.as_default():
+        sign = img_rgb[sign_rect[1]: sign_rect[1] + sign_rect[3], sign_rect[0]: sign_rect[0] + sign_rect[2]]
+        sign = cv2.resize(sign, (32, 32))
+        # sign = cv2.cvtColor(sign, cv2.COLOR_BGR2GRAY)
+        # cv2.imshow("sign", sign)
+        sign = np.array([sign])
+        result = model.predict(sign, batch_size = 1) + 1
     return result
 left_cors = get_line_cor((159, 159), (0, 130)).T
 right_cors = get_line_cor((159, 160), (0, 190)).T
@@ -229,7 +228,7 @@ def get_steer(img_rgb, mask):
     bird_view = bird_view - temp
     bird_view = bird_view.astype(np.uint8)
 
-    # cv2.imshow("mask", road_mask)
+    cv2.imshow("mask", frame)
     # cv2.imshow("bird_view", bird_view)
     angle = (get_confident_vectors(bird_view)) * 25
     speed = dynamic_speed(angle)

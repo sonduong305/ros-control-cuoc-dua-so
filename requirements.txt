@@ -1,0 +1,5 @@
+tensorflow==1.14.0
+keras==2.2.5
+opencv-python
+scikit-image
+rospy
